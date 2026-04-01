@@ -1,6 +1,6 @@
 """
 Транспортная задача – метод потенциалов (вариант 23, вторая таблица)
-Без дополнительной обработки вырожденности (для данных варианта базис полный).
+С обработкой вырожденности и связности базиса.
 """
 
 def print_table(X, cost, supply, demand, title="Таблица", real_rows=None, real_cols=None):
@@ -69,6 +69,54 @@ def balance(supply, demand, cost):
         return supply, demand, cost
 
 
+def ensure_connected_basis(X, basis, m, n, cost):
+    """
+    Если базис неполный (меньше m+n-1), добавляет нулевые перевозки,
+    сохраняя связность. Возвращает обновлённый список базисных клеток.
+    """
+    required = m + n - 1
+    if len(basis) >= required:
+        return basis
+
+    basis_set = set(basis)
+    free_cells = [(cost[i][j], i, j) for i in range(m) for j in range(n) if (i, j) not in basis_set]
+    free_cells.sort()
+
+    def find_components(basis_list):
+        parent = list(range(m + n))
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+        def union(x, y):
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[ry] = rx
+        for i, j in basis_list:
+            union(i, m + j)
+        return find
+
+    while len(basis) < required:
+        find = find_components(basis)
+        added = False
+        for _, i, j in free_cells:
+            if find(i) != find(m + j):
+                X[i][j] = 0
+                basis.append((i, j))
+                basis_set.add((i, j))
+                added = True
+                break
+        if not added:
+            for _, i, j in free_cells:
+                if (i, j) not in basis_set:
+                    X[i][j] = 0
+                    basis.append((i, j))
+                    basis_set.add((i, j))
+                    break
+    return basis
+
+
 def north_west(supply, demand, cost):
     """Метод северо-западного угла"""
     m, n = len(supply), len(demand)
@@ -87,6 +135,7 @@ def north_west(supply, demand, cost):
             i += 1
         if d[j] == 0:
             j += 1
+    basis = ensure_connected_basis(X, basis, m, n, cost)
     return X, basis
 
 
@@ -105,6 +154,7 @@ def min_cost_method(supply, demand, cost):
             basis.append((i, j))
             s[i] -= amount
             d[j] -= amount
+    basis = ensure_connected_basis(X, basis, m, n, cost)
     return X, basis
 
 
