@@ -1,10 +1,5 @@
-"""
-Транспортная задача – метод потенциалов (вариант 23, вторая таблица)
-С обработкой вырожденности и связности базиса.
-"""
 
 def print_table(X, cost, supply, demand, title="Таблица", real_rows=None, real_cols=None):
-    """Красивый вывод таблицы перевозок (только реальные строки/столбцы)"""
     if real_rows is None:
         real_rows = len(supply)
     if real_cols is None:
@@ -38,7 +33,6 @@ def print_table(X, cost, supply, demand, title="Таблица", real_rows=None,
 
 
 def total_real_cost(X, cost, real_rows, real_cols):
-    """Стоимость только реальных перевозок"""
     total = 0
     for i in range(real_rows):
         for j in range(real_cols):
@@ -47,7 +41,6 @@ def total_real_cost(X, cost, real_rows, real_cols):
 
 
 def balance(supply, demand, cost):
-    """Балансировка задачи"""
     total_supply = sum(supply)
     total_demand = sum(demand)
     print(f"\nПроверка баланса: запасы={total_supply}, спрос={total_demand}")
@@ -68,12 +61,45 @@ def balance(supply, demand, cost):
         print(f"Добавлен фиктивный потребитель со спросом {fake} (стоимость 0)")
         return supply, demand, cost
 
+def north_west(supply, demand, cost):
+    m, n = len(supply), len(demand)
+    s, d = supply[:], demand[:]
+    X = [[0]*n for _ in range(m)]
+    basis = []
+    i, j = 0, 0
+    while i < m and j < n:
+        amount = min(s[i], d[j])
+        X[i][j] = amount
+        if amount > 0:
+            basis.append((i, j))
+        s[i] -= amount
+        d[j] -= amount
+        if s[i] == 0:
+            i += 1
+        if d[j] == 0:
+            j += 1
+    basis = ensure_connected_basis(X, basis, m, n, cost)
+    return X, basis
+
+
+def min_cost_method(supply, demand, cost):
+    m, n = len(supply), len(demand)
+    s, d = supply[:], demand[:]
+    X = [[0]*n for _ in range(m)]
+    basis = []
+    cells = [(cost[i][j], i, j) for i in range(m) for j in range(n)]
+    cells.sort()
+    for c, i, j in cells:
+        if s[i] > 0 and d[j] > 0:
+            amount = min(s[i], d[j])
+            X[i][j] = amount
+            basis.append((i, j))
+            s[i] -= amount
+            d[j] -= amount
+    basis = ensure_connected_basis(X, basis, m, n, cost)
+    return X, basis
 
 def ensure_connected_basis(X, basis, m, n, cost):
-    """
-    Если базис неполный (меньше m+n-1), добавляет нулевые перевозки,
-    сохраняя связность. Возвращает обновлённый список базисных клеток.
-    """
     required = m + n - 1
     if len(basis) >= required:
         return basis
@@ -117,49 +143,7 @@ def ensure_connected_basis(X, basis, m, n, cost):
     return basis
 
 
-def north_west(supply, demand, cost):
-    """Метод северо-западного угла"""
-    m, n = len(supply), len(demand)
-    s, d = supply[:], demand[:]
-    X = [[0]*n for _ in range(m)]
-    basis = []
-    i, j = 0, 0
-    while i < m and j < n:
-        amount = min(s[i], d[j])
-        X[i][j] = amount
-        if amount > 0:
-            basis.append((i, j))
-        s[i] -= amount
-        d[j] -= amount
-        if s[i] == 0:
-            i += 1
-        if d[j] == 0:
-            j += 1
-    basis = ensure_connected_basis(X, basis, m, n, cost)
-    return X, basis
-
-
-def min_cost_method(supply, demand, cost):
-    """Метод минимальной стоимости"""
-    m, n = len(supply), len(demand)
-    s, d = supply[:], demand[:]
-    X = [[0]*n for _ in range(m)]
-    basis = []
-    cells = [(cost[i][j], i, j) for i in range(m) for j in range(n)]
-    cells.sort()
-    for c, i, j in cells:
-        if s[i] > 0 and d[j] > 0:
-            amount = min(s[i], d[j])
-            X[i][j] = amount
-            basis.append((i, j))
-            s[i] -= amount
-            d[j] -= amount
-    basis = ensure_connected_basis(X, basis, m, n, cost)
-    return X, basis
-
-
 def calculate_potentials(X, cost, basis, m, n):
-    """Расчёт потенциалов u и v"""
     u = [None] * m
     v = [None] * n
     u[0] = 0
@@ -177,7 +161,6 @@ def calculate_potentials(X, cost, basis, m, n):
 
 
 def evaluate_plan(X, basis, cost, supply, demand, real_rows, real_cols):
-    """Проверка оптимальности плана методом потенциалов"""
     m, n = len(supply), len(demand)
     u, v = calculate_potentials(X, cost, basis, m, n)
 
@@ -210,7 +193,6 @@ def evaluate_plan(X, basis, cost, supply, demand, real_rows, real_cols):
 
 
 def main():
-    # Исходные данные (вторая таблица)
     supply_real = [190, 110, 105, 255, 245]
     demand_real = [50, 150, 240, 145, 95]
     cost_real = [
@@ -225,7 +207,6 @@ def main():
     print("ТРАНСПОРТНАЯ ЗАДАЧА (вариант 23, вторая таблица)")
     print("="*70)
 
-    # Балансировка
     supply, demand, cost = balance(
         supply_real[:], demand_real[:],
         [row[:] for row in cost_real]
@@ -233,22 +214,18 @@ def main():
 
     real_rows, real_cols = len(supply_real), len(demand_real)
 
-    # Опорный план методом северо-западного угла
     X_nw, basis_nw = north_west(supply[:], demand[:], cost)
     cost_nw = total_real_cost(X_nw, cost, real_rows, real_cols)
 
-    # Опорный план методом минимальной стоимости
     X_min, basis_min = min_cost_method(supply[:], demand[:], cost)
     cost_min = total_real_cost(X_min, cost, real_rows, real_cols)
 
-    # Вывод таблиц
     print_table(X_nw, cost, supply, demand, "ОПОРНЫЙ ПЛАН: СЕВЕРО-ЗАПАДНЫЙ УГОЛ", real_rows, real_cols)
     print(f"Стоимость (только реальные): {cost_nw}")
 
     print_table(X_min, cost, supply, demand, "ОПОРНЫЙ ПЛАН: МЕТОД МИНИМАЛЬНОЙ СТОИМОСТИ", real_rows, real_cols)
     print(f"Стоимость (только реальные): {cost_min}")
 
-    # Сравнение
     print("\n" + "="*60)
     print("СРАВНЕНИЕ ОПОРНЫХ ПЛАНОВ")
     print("="*60)
@@ -262,7 +239,6 @@ def main():
 
     print(f"\nЛучший опорный план: {best_name} (стоимость {best_cost})")
 
-    # Проверка оптимальности
     print("\n" + "="*60)
     print("МЕТОД ПОТЕНЦИАЛОВ (проверка оптимальности)")
     print("="*60)
